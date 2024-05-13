@@ -35,7 +35,7 @@ import java.util.function.Predicate;
  */
 public abstract class AbstractResolver {
 
-    private static final int TIMEOUT = 10_000;
+    private static final int TIMEOUT = 5_000;
     private static final String USER_AGENT = "CraftAPIClient";
 
     // skip only maximum amount to prevent too long transfers that will be just discarded
@@ -127,7 +127,7 @@ public abstract class AbstractResolver {
         HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection();
 
         conn.setConnectTimeout(TIMEOUT);
-        conn.setReadTimeout(2 * TIMEOUT);
+        conn.setReadTimeout(TIMEOUT);
 
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setRequestProperty("User-Agent", USER_AGENT);
