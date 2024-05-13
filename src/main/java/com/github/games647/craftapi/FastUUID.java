@@ -211,8 +211,8 @@ public class FastUUID {
      */
     public static String toStringDashed(UUID uuid) {
         if (USE_JDK_UUID_TO_STRING) {
-            // OpenJDK 9 and newer use a fancy native approach to converting UUIDs to strings and we're better off using
-            // that if it's available.
+            // OpenJDK 9 and newer use a fancy native approach to converting UUIDs to strings, and we're better off
+            // using that if it's available.
             return uuid.toString();
         }
 

@@ -30,6 +30,7 @@ import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Optional;
@@ -83,7 +84,7 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
 
         HttpRequest req = createJSONReq(url);
         try {
-            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> resp = client.send(req, BodyHandlers.ofString());
             int responseCode = resp.statusCode();
             if (responseCode == HttpURLConnection.HTTP_NOT_FOUND || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
                 return Optional.empty();
@@ -178,7 +179,7 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
     protected Optional<Profile> findProfile(HttpClient client, HttpRequest req)
             throws IOException, RateLimitException {
         try {
-            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> resp = client.send(req, BodyHandlers.ofString());
 
             int responseCode = resp.statusCode();
             if (responseCode == RateLimitException.RATE_LIMIT_RESPONSE_CODE) {

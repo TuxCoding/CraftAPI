@@ -19,7 +19,6 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
-import java.net.Proxy;
 import java.net.URI;
 import java.net.URL;
 import java.net.http.HttpClient;
@@ -119,24 +118,13 @@ public abstract class AbstractResolver {
     /**
      * Create a new HTTPConnection with default timeout and HTTP-Headers for json accept and user-agent.
      *
-     * @param url the complete url
-     * @return an unestablished HTTPConnection
-     * @throws IOException I/O exception on opening the data channel
-     */
-    protected HttpURLConnection getConnection(String url) throws IOException {
-        return getConnection(url, Proxy.NO_PROXY);
-    }
-
-    /**
-     * Create a new HTTPConnection with default timeout and HTTP-Headers for json accept and user-agent.
-     *
      * @param url http connection URL
      * @param proxy HTTP or SOCKS proxy through this connection
      * @return an unestablished HTTPConnection
      * @throws IOException I/O exception on opening the data channel
      */
-    protected HttpURLConnection getConnection(String url, Proxy proxy) throws IOException {
-        HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection(proxy);
+    protected HttpURLConnection getConnection(String url) throws IOException {
+        HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection();
 
         conn.setConnectTimeout(TIMEOUT);
         conn.setReadTimeout(2 * TIMEOUT);

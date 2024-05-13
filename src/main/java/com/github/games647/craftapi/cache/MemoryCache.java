@@ -9,7 +9,6 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 
 /**
  * In memory cache for the skins and profiles.
@@ -36,10 +35,10 @@ public class MemoryCache implements Cache {
      * @param skinSize skin max cache size &le; 0 to disable
      */
     public MemoryCache(Duration uuidExpire, int uuidSize, Duration skinExpire, int skinSize) {
-        uuidToProfileCache = buildCache(uuidExpire.getSeconds(), uuidSize);
-        nameToProfileCache = buildCache(uuidExpire.getSeconds(), uuidSize);
+        uuidToProfileCache = buildCache(uuidExpire, uuidSize);
+        nameToProfileCache = buildCache(uuidExpire, uuidSize);
 
-        skinCache = buildCache(skinExpire.getSeconds(), skinSize);
+        skinCache = buildCache(skinExpire, skinSize);
     }
 
     /**
@@ -104,11 +103,10 @@ public class MemoryCache implements Cache {
         return ImmutableSet.copyOf(skinCache.values());
     }
 
-    private <K, V> ConcurrentMap<K, V> buildCache(long expireAfterWrite, int maxSize) {
+    private <K, V> ConcurrentMap<K, V> buildCache(Duration expireAfterWrite, int maxSize) {
         CacheBuilder<Object, Object> builder = CacheBuilder.newBuilder();
-
-        if (expireAfterWrite > 0) {
-            builder.expireAfterWrite(expireAfterWrite, TimeUnit.SECONDS);
+        if (expireAfterWrite != null) {
+            builder.expireAfterWrite(expireAfterWrite);
         }
 
         if (maxSize > 0) {
