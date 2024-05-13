@@ -16,6 +16,7 @@ import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
+import javax.net.ssl.HttpsURLConnection;
 import java.awt.image.RenderedImage;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
@@ -25,12 +26,12 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.Inet6Address;
 import java.net.InetAddress;
-import java.net.Proxy;
-import java.net.Proxy.Type;
 import java.net.ProxySelector;
-import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Optional;
@@ -54,17 +55,20 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
     //authentication
     private static final String AUTH_URL = "https://authserver.mojang.com/authenticate";
     private static final String HAS_JOINED_URL_PROXY_CHECK = "https://sessionserver.mojang.com/session/minecraft/" +
-        "hasJoined?username=%s&serverId=%s&ip=%s";
+            "hasJoined?username=%s&serverId=%s&ip=%s";
     private static final String HAS_JOINED_URL_RAW = "https://sessionserver.mojang.com/session/minecraft/hasJoined?" +
             "username=%s&serverId=%s";
 
     private ProxySelector proxySelector = ProxySelector.getDefault();
 
     private int maxNameRequests = 600;
-    private RateLimiter profileLimiter = new TickingRateLimiter(
+    private final RateLimiter profileLimiter = new TickingRateLimiter(
             Ticker.systemTicker(), maxNameRequests,
             TimeUnit.MINUTES.toMillis(10)
     );
+
+    private final HttpClient client = HttpClient.newHttpClient();
+    private final HttpClient proxyClient = HttpClient.newBuilder().proxy(proxySelector).build();
 
     @Override
     public Optional<Verification> hasJoined(String username, String serverHash, InetAddress hostIp)
@@ -75,17 +79,22 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
             // a vanilla server
             url = String.format(HAS_JOINED_URL_RAW, username, serverHash);
         } else {
-            String encodedIP = URLEncoder.encode(hostIp.getHostAddress(), StandardCharsets.UTF_8.name());
+            String encodedIP = URLEncoder.encode(hostIp.getHostAddress(), StandardCharsets.UTF_8);
             url = String.format(HAS_JOINED_URL_PROXY_CHECK, username, serverHash, encodedIP);
         }
 
-        HttpURLConnection conn = getConnection(url);
-        int responseCode = conn.getResponseCode();
-        if (responseCode == HttpURLConnection.HTTP_NOT_FOUND || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            return Optional.empty();
-        }
+        HttpRequest req = createJSONReq(url);
+        try {
+            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            int responseCode = resp.statusCode();
+            if (responseCode == HttpURLConnection.HTTP_NOT_FOUND || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+                return Optional.empty();
+            }
 
-        return Optional.of(parseRequest(conn, in -> readJson(in, Verification.class)));
+            return Optional.of(readJson(resp.body(), Verification.class));
+        } catch (InterruptedException e) {
+            throw new IOException(e);
+        }
     }
 
     @Override
@@ -93,7 +102,6 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
         HttpURLConnection conn = getConnection(AUTH_URL);
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
-
         try (
                 OutputStream out = conn.getOutputStream();
                 OutputStreamWriter outWriter = new OutputStreamWriter(out, StandardCharsets.UTF_8);
@@ -126,7 +134,7 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
             }
 
             final String skinUrl = toUrl.toExternalForm();
-            writer.write("&url=" + URLEncoder.encode(skinUrl, StandardCharsets.UTF_8.name()));
+            writer.write("&url=" + URLEncoder.encode(skinUrl, StandardCharsets.UTF_8));
         }
 
         int responseCode = conn.getResponseCode();
@@ -172,22 +180,25 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
         }
 
         String url = UUID_URL + name;
-        HttpURLConnection conn;
-        if (profileLimiter.tryAcquire()) {
-            conn = getConnection(url);
-        } else {
-            conn = getProxyConnection(url);
+        HttpRequest req = createJSONReq(url);
+
+        HttpClient client = this.client;
+        if (!profileLimiter.tryAcquire()) {
+            client = proxyClient;
         }
 
         try {
-            int responseCode = conn.getResponseCode();
+            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+
+            int responseCode = resp.statusCode();
             if (responseCode == RateLimitException.RATE_LIMIT_RESPONSE_CODE) {
-                if (conn.usingProxy()) {
+                if (client.proxy().isPresent()) {
                     throw new RateLimitException();
                 }
 
-                conn = getProxyConnection(url);
-                responseCode = conn.getResponseCode();
+                client = HttpClient.newBuilder().proxy(proxySelector).build();
+                resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+                responseCode = resp.statusCode();
             }
 
             if (responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
@@ -195,9 +206,11 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
             }
 
             //todo: print errorstream on IOException
-            Profile profile = readJson(conn.getInputStream(), Profile.class);
+            Profile profile = readJson(resp.body(), Profile.class);
             cache.add(profile);
             return Optional.of(profile);
+        } catch (InterruptedException interruptedException) {
+            return Optional.empty();
         } catch (FileNotFoundException fileNotFoundException) {
             //new API treats not found as cracked
             return Optional.empty();
@@ -239,15 +252,6 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
 
         cache.addSkin(uuid, property);
         return Optional.of(property);
-    }
-
-    private HttpURLConnection getProxyConnection(String url) throws RateLimitException, IOException {
-        Proxy proxy = proxySelector.select(URI.create(url)).get(0);
-        if (proxy.type() == Type.DIRECT) {
-            throw new RateLimitException();
-        }
-
-        return getConnection(UUID_URL, proxy);
     }
 
     /**

@@ -8,7 +8,7 @@ communicating with Mojang. Furthermore, this project is used for experimenting w
 ## Features
 
 * Minimal requirements to integrate it into Sponge, BungeeCord and Spigot
-* Compatibility with Minecraft 1.7.10+
+* Compatibility with Minecraft 1.8.8+
 * Thread-Safe
 * Usage of modern Java 8 features
 * UUID and skin querying
@@ -31,9 +31,9 @@ communicating with Mojang. Furthermore, this project is used for experimenting w
 
 ## Requirements
 
-* Java 8+
-* Gson (2.2.4+)
-* Guava (10.0.1+)
+* Java 11+
+* Gson
+* Guava
 
 ## Contribution
 

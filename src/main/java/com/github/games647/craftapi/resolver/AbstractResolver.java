@@ -11,6 +11,7 @@ import com.github.games647.craftapi.resolver.http.RotatingSourceFactory;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import javax.net.ssl.HttpsURLConnection;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,15 +20,15 @@ import java.io.Reader;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.Proxy;
+import java.net.URI;
 import java.net.URL;
+import java.net.http.HttpRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.UUID;
 import java.util.function.Predicate;
-
-import javax.net.ssl.HttpsURLConnection;
 
 /**
  * Base class for fetching Minecraft related data.
@@ -102,11 +103,13 @@ public abstract class AbstractResolver {
      * @throws IOException if an error occurs while reading the stream
      */
     protected <T> T readJson(Reader reader, Class<T> classOfT) throws IOException {
-        try {
+        try (reader) {
             return gson.fromJson(reader, classOfT);
-        } finally {
-            reader.close();
         }
+    }
+
+    protected <T> T readJson(String json, Class<T> classOfT) {
+        return gson.fromJson(json, classOfT);
     }
 
     /**
@@ -138,9 +141,20 @@ public abstract class AbstractResolver {
         conn.setRequestProperty("User-Agent", USER_AGENT);
 
         // do not set factory if not necessary, because it could help to keep the connection alive
-        if (sslFactory != null)
+        if (sslFactory != null) {
+            HttpsURLConnection.getDefaultSSLSocketFactory();
             conn.setSSLSocketFactory(sslFactory);
+        }
+
         return conn;
+    }
+
+    protected static HttpRequest createJSONReq(String url) {
+        return HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .GET()
+                .build();
     }
 
     /**
