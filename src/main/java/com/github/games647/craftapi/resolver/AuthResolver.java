@@ -1,6 +1,6 @@
 package com.github.games647.craftapi.resolver;
 
-import com.github.games647.craftapi.model.auth.Account;
+import com.github.games647.craftapi.model.auth.MinecraftAccount;
 import com.github.games647.craftapi.model.auth.Verification;
 import com.github.games647.craftapi.model.skin.Model;
 
@@ -27,17 +27,6 @@ public interface AuthResolver {
     Optional<Verification> hasJoined(String username, String serverHash, InetAddress hostIp) throws IOException;
 
     /**
-     * Logs the given player account in.
-     *
-     * @param email email address
-     * @param password plain text password
-     * @return logged in account
-     * @throws IOException I/O exception contacting the server
-     * @throws InvalidCredentialsException invalid auth data
-     */
-    Account authenticate(String email, String password) throws IOException, InvalidCredentialsException;
-
-    /**
      * Changes the skin to the image that can be downloaded from that URL. The URL have to be direct link without
      * things like HTML in it.
      *
@@ -46,7 +35,7 @@ public interface AuthResolver {
      * @param skinModel skin arm model
      * @throws IOException I/O exception contacting the server
      */
-    void changeSkin(Account account, URL toUrl, Model skinModel) throws IOException;
+    void changeSkin(MinecraftAccount account, URL toUrl, Model skinModel) throws IOException;
 
     /**
      * Changes the skin to the given image.
@@ -56,7 +45,7 @@ public interface AuthResolver {
      * @param skinModel skin arm model
      * @throws IOException I/O exception contacting the server
      */
-    void changeSkin(Account account, RenderedImage pngImage, Model skinModel) throws IOException;
+    void changeSkin(MinecraftAccount account, RenderedImage pngImage, Model skinModel) throws IOException;
 
     /**
      * Clears the uploaded skin.
@@ -65,6 +54,6 @@ public interface AuthResolver {
      * @throws IOException I/O exception contacting the server
      * @return true if successful
      */
-    boolean resetSkin(Account account) throws IOException;
+    boolean resetSkin(MinecraftAccount account) throws IOException;
 
 }

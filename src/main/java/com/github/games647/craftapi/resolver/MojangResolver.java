@@ -3,9 +3,7 @@ package com.github.games647.craftapi.resolver;
 import com.github.games647.craftapi.UUIDAdapter;
 import com.github.games647.craftapi.model.NameHistory;
 import com.github.games647.craftapi.model.Profile;
-import com.github.games647.craftapi.model.auth.Account;
-import com.github.games647.craftapi.model.auth.AuthRequest;
-import com.github.games647.craftapi.model.auth.AuthResponse;
+import com.github.games647.craftapi.model.auth.MinecraftAccount;
 import com.github.games647.craftapi.model.auth.Verification;
 import com.github.games647.craftapi.model.skin.Model;
 import com.github.games647.craftapi.model.skin.SkinProperty;
@@ -98,24 +96,7 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
     }
 
     @Override
-    public Account authenticate(String email, String password) throws IOException, InvalidCredentialsException {
-        HttpURLConnection conn = getConnection(AUTH_URL);
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        try (
-                OutputStream out = conn.getOutputStream();
-                OutputStreamWriter outWriter = new OutputStreamWriter(out, StandardCharsets.UTF_8);
-                BufferedWriter writer = new BufferedWriter(outWriter)
-        ) {
-            writer.append(gson.toJson(new AuthRequest(email, password)));
-        }
-
-        AuthResponse authResponse = parseRequest(conn, in -> readJson(in, AuthResponse.class));
-        return new Account(authResponse.getSelectedProfile(), authResponse.getAccessToken());
-    }
-
-    @Override
-    public void changeSkin(Account account, URL toUrl, Model skinModel) throws IOException {
+    public void changeSkin(MinecraftAccount account, URL toUrl, Model skinModel) throws IOException {
         String url = String.format(CHANGE_SKIN_URL, UUIDAdapter.toMojangId(account.getProfile().getId()));
 
         HttpURLConnection conn = getConnection(url);
@@ -145,12 +126,12 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
     }
 
     @Override
-    public void changeSkin(Account account, RenderedImage pngImage, Model skinModel) throws IOException {
+    public void changeSkin(MinecraftAccount account, RenderedImage pngImage, Model skinModel) throws IOException {
         throw new UnsupportedOperationException("Not implemented yet");
     }
 
     @Override
-    public boolean resetSkin(Account account) throws IOException {
+    public boolean resetSkin(MinecraftAccount account) throws IOException {
         String url = String.format(RESET_SKIN_URL, account.getProfile().getId());
 
         HttpURLConnection conn = getConnection(url);

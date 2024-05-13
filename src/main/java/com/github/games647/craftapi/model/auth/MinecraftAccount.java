@@ -2,16 +2,18 @@ package com.github.games647.craftapi.model.auth;
 
 import com.github.games647.craftapi.model.Profile;
 
+import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
  * Represents a logged in Mojang account.
  */
-public class Account {
+public class MinecraftAccount {
 
     private final Profile profile;
     private final UUID accessToken;
+    private final Duration expiresIn;
 
     /**
      * Creates a new Mojang account.
@@ -19,9 +21,10 @@ public class Account {
      * @param profile the selected game profile
      * @param accessToken access token for authentication instead of the password
      */
-    public Account(Profile profile, UUID accessToken) {
+    public MinecraftAccount(Profile profile, UUID accessToken, Duration expiresIn) {
         this.profile = profile;
         this.accessToken = accessToken;
+        this.expiresIn = expiresIn;
     }
 
     /**
@@ -38,14 +41,18 @@ public class Account {
         return accessToken;
     }
 
+    public Duration getExpiresIn() {
+        return expiresIn;
+    }
+
     @Override
     public boolean equals(Object other) {
         if (this == other) {
             return true;
         }
 
-        if (other instanceof Account) {
-            Account account = (Account) other;
+        if (other instanceof MinecraftAccount) {
+            MinecraftAccount account = (MinecraftAccount) other;
             return Objects.equals(profile, account.profile) &&
                     Objects.equals(accessToken, account.accessToken);
         }
