@@ -43,6 +43,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class MojangResolver extends AbstractResolver implements AuthResolver, ProfileResolver {
 
+    static {
+        // A try to fix https://bugs.openjdk.org/browse/JDK-8197807
+        HttpsURLConnection.getDefaultSSLSocketFactory();
+    }
+
     //profile
     private static final String UUID_URL = "https://api.mojang.com/users/profiles/minecraft/";
 
