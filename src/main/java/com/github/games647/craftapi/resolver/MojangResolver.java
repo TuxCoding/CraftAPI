@@ -79,7 +79,7 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
     public Optional<Verification> hasJoined(String username, String serverHash, InetAddress hostIp)
             throws IOException {
         String url;
-        if (hostIp instanceof Inet6Address) {
+        if (hostIp == null || hostIp instanceof Inet6Address) {
             // Mojang currently doesn't check the IPv6 address correct. The prevent-proxy even doesn't work with
             // a vanilla server
             url = String.format(HAS_JOINED_URL_RAW, username, serverHash);
