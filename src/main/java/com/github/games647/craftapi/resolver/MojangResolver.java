@@ -64,16 +64,11 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
     private static final String HAS_JOINED_URL_RAW = "https://sessionserver.mojang.com/session/minecraft/hasJoined?" +
             "username=%s&serverId=%s";
 
-    private ProxySelector proxySelector = ProxySelector.getDefault();
-
     private int maxNameRequests = 600;
     private final RateLimiter profileLimiter = new TickingRateLimiter(
             Ticker.systemTicker(), maxNameRequests,
             TimeUnit.MINUTES.toMillis(10)
     );
-
-    private final HttpClient client = HttpClient.newHttpClient();
-    private final HttpClient proxyClient = HttpClient.newBuilder().proxy(proxySelector).build();
 
     @Override
     public Optional<Verification> hasJoined(String username, String serverHash, InetAddress hostIp)
@@ -189,21 +184,30 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
 
         HttpClient client = this.client;
         if (!profileLimiter.tryAcquire()) {
+            if (proxyClient == null) {
+                throw new RateLimitException();
+            }
+
             client = proxyClient;
         }
 
+        return findProfile(client, req);
+    }
+
+    protected Optional<Profile> findProfile(HttpClient client, HttpRequest req)
+            throws IOException, RateLimitException {
         try {
             HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
 
             int responseCode = resp.statusCode();
             if (responseCode == RateLimitException.RATE_LIMIT_RESPONSE_CODE) {
-                if (client.proxy().isPresent()) {
+                if (client.proxy().isPresent() || proxyClient == null) {
+                    // was from the proxy executor or there are no proxies available
                     throw new RateLimitException();
                 }
 
-                client = HttpClient.newBuilder().proxy(proxySelector).build();
-                resp = client.send(req, HttpResponse.BodyHandlers.ofString());
-                responseCode = resp.statusCode();
+                // another try with a proxy
+                return findProfile(proxyClient, req);
             }
 
             if (responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
@@ -260,25 +264,10 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
     }
 
     /**
-     * @return maximum amount of name to UUID requests that will be established to Mojang directly without proxies.
-     * (Between 0 and 600 within 10 minutes). Default is 600.
-     */
-    public int getMaxNameRequests() {
-        return maxNameRequests;
-    }
-
-    /**
-     * @return the current proxy selector or {@link ProxySelector#getDefault()} if none
-     */
-    public ProxySelector getProxySelector() {
-        return proxySelector;
-    }
-
-    /**
      * @param proxySelector proxy selector that should be used
      */
     public void setProxySelector(ProxySelector proxySelector) {
-        this.proxySelector = proxySelector;
+        proxyClient = HttpClient.newBuilder().proxy(proxySelector).build();
     }
 
     /**

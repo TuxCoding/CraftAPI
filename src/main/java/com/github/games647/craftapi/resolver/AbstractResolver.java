@@ -22,6 +22,7 @@ import java.net.InetAddress;
 import java.net.Proxy;
 import java.net.URI;
 import java.net.URL;
+import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -50,6 +51,9 @@ public abstract class AbstractResolver {
             .registerTypeAdapter(UUID.class, new UUIDAdapter())
             .registerTypeAdapter(Instant.class, new InstantAdapter())
             .create();
+
+    protected final HttpClient client = HttpClient.newHttpClient();
+    protected HttpClient proxyClient;
 
     /**
      * Decodes the property from a skin request.
