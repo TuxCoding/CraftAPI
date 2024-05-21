@@ -17,6 +17,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.Builder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Collection;
@@ -76,6 +77,7 @@ public abstract class AbstractResolver {
 
     protected static Builder createJSONReq(String url) {
         return HttpRequest.newBuilder()
+                .timeout(Duration.ofSeconds(5))
                 .uri(URI.create(url))
                 .header("Content-Type", "application/json");
     }
