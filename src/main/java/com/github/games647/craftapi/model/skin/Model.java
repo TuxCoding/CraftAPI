@@ -8,7 +8,7 @@ import com.google.gson.annotations.SerializedName;
 public enum Model {
 
     /**
-     * Default model with square arms (Steve style)
+     * Default model with square arms (Steve style) also known as classic
      */
     SQUARE("Steve"),
 

@@ -40,7 +40,7 @@ public class RotatingProxySelector extends ProxySelector {
      * @param proxies all HTTP or SOCKS proxies
      */
     public RotatingProxySelector(Iterable<Proxy> proxies) {
-        this(proxies, ProxySelector.getDefault());
+        this(proxies, getDefault());
     }
 
     @Override

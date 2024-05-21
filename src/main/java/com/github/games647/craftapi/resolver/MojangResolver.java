@@ -5,6 +5,7 @@ import com.github.games647.craftapi.model.NameHistory;
 import com.github.games647.craftapi.model.Profile;
 import com.github.games647.craftapi.model.auth.MinecraftAccount;
 import com.github.games647.craftapi.model.auth.Verification;
+import com.github.games647.craftapi.model.skin.ChangeSkin;
 import com.github.games647.craftapi.model.skin.Model;
 import com.github.games647.craftapi.model.skin.SkinProperty;
 import com.github.games647.craftapi.model.skin.Textures;
@@ -16,19 +17,18 @@ import com.google.common.collect.ImmutableSet;
 
 import javax.net.ssl.HttpsURLConnection;
 import java.awt.image.RenderedImage;
-import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.ProxySelector;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
+import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
@@ -57,7 +57,6 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
             "?unsigned=false";
 
     //authentication
-    private static final String AUTH_URL = "https://authserver.mojang.com/authenticate";
     private static final String HAS_JOINED_URL_PROXY_CHECK = "https://sessionserver.mojang.com/session/minecraft/" +
             "hasJoined?username=%s&serverId=%s&ip=%s";
     private static final String HAS_JOINED_URL_RAW = "https://sessionserver.mojang.com/session/minecraft/hasJoined?" +
@@ -82,9 +81,10 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
             url = String.format(HAS_JOINED_URL_PROXY_CHECK, username, serverHash, encodedIP);
         }
 
-        HttpRequest req = createJSONReq(url);
+        HttpRequest req = createJSONGet(url);
         try {
             HttpResponse<String> resp = client.send(req, BodyHandlers.ofString());
+
             int responseCode = resp.statusCode();
             if (responseCode == HttpURLConnection.HTTP_NOT_FOUND || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
                 return Optional.empty();
@@ -100,29 +100,21 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
     public void changeSkin(MinecraftAccount account, URL toUrl, Model skinModel) throws IOException {
         String url = String.format(CHANGE_SKIN_URL, UUIDAdapter.toMojangId(account.getProfile().getId()));
 
-        HttpURLConnection conn = getConnection(url);
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
+        String payload = gson.toJson(new ChangeSkin(skinModel, toUrl));
+        HttpRequest req = createJSONReq(url)
+                .header("Authorization", "Bearer " + account.getAccessToken())
+                .POST(BodyPublishers.ofString(payload))
+                .build();
 
-        conn.addRequestProperty("Authorization", "Bearer " + account.getAccessToken());
-        try (
-                OutputStream out = conn.getOutputStream();
-                OutputStreamWriter outWriter = new OutputStreamWriter(out, StandardCharsets.UTF_8);
-                BufferedWriter writer = new BufferedWriter(outWriter)
-        ) {
-            writer.write("model=");
-            if (skinModel == Model.SLIM) {
-                writer.write("slim");
+        try {
+            HttpResponse<String> resp = client.send(req, BodyHandlers.ofString());
+
+            int responseCode = resp.statusCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw new IOException("Response code is not Ok: " + responseCode);
             }
-
-            final String skinUrl = toUrl.toExternalForm();
-            writer.write("&url=" + URLEncoder.encode(skinUrl, StandardCharsets.UTF_8));
-        }
-
-        int responseCode = conn.getResponseCode();
-        discard(conn);
-        if (responseCode != HttpURLConnection.HTTP_OK) {
-            throw new IOException("Response code is not Ok: " + responseCode);
+        } catch (InterruptedException e) {
+            throw new IOException(e);
         }
     }
 
@@ -135,13 +127,20 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
     public boolean resetSkin(MinecraftAccount account) throws IOException {
         String url = String.format(RESET_SKIN_URL, account.getProfile().getId());
 
-        HttpURLConnection conn = getConnection(url);
-        conn.setRequestMethod("DELETE");
-        conn.addRequestProperty("Authorization", "Bearer " + account.getAccessToken());
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + account.getAccessToken())
+                .DELETE()
+                .build();
+        try {
+            HttpResponse<String> resp = client.send(req, BodyHandlers.ofString());
 
-        int responseCode = conn.getResponseCode();
-        discard(conn);
-        return responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT;
+            int responseCode = resp.statusCode();
+            return responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NO_CONTENT;
+        } catch (InterruptedException e) {
+            throw new IOException(e);
+        }
     }
 
     @Override
@@ -162,7 +161,7 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
         }
 
         String url = UUID_URL + name;
-        HttpRequest req = createJSONReq(url);
+        HttpRequest req = createJSONGet(url);
 
         HttpClient client = this.client;
         if (!profileLimiter.tryAcquire()) {
@@ -226,23 +225,27 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
         }
 
         String url = String.format(SKIN_URL, UUIDAdapter.toMojangId(uuid));
-        HttpURLConnection conn = getConnection(url);
+        HttpRequest req = createJSONGet(url);
+        try {
+            HttpResponse<String> resp = client.send(req, BodyHandlers.ofString());
 
-        int responseCode = conn.getResponseCode();
-        if (responseCode == RateLimitException.RATE_LIMIT_RESPONSE_CODE) {
-            discard(conn);
-            throw new RateLimitException();
+            int responseCode = resp.statusCode();
+            if (responseCode == RateLimitException.RATE_LIMIT_RESPONSE_CODE) {
+                throw new RateLimitException();
+            }
+
+            if (responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+                return Optional.empty();
+            }
+
+            Textures texturesModel = readJson(resp.body(), Textures.class);
+            SkinProperty property = texturesModel.getProperties()[0];
+
+            cache.addSkin(uuid, property);
+            return Optional.of(property);
+        } catch (InterruptedException e) {
+            throw new IOException(e);
         }
-
-        if (responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-            return Optional.empty();
-        }
-
-        Textures texturesModel = parseRequest(conn, in -> readJson(in, Textures.class));
-        SkinProperty property = texturesModel.getProperties()[0];
-
-        cache.addSkin(uuid, property);
-        return Optional.of(property);
     }
 
     /**
