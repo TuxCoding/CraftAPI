@@ -7,16 +7,13 @@ import com.github.games647.craftapi.model.skin.SkinProperty;
 import com.github.games647.craftapi.model.skin.SkinPropertyTest;
 import com.github.games647.craftapi.model.skin.Texture;
 import com.github.games647.craftapi.model.skin.Texture.Type;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.Optional;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 class AbstractResolverTest {
 
@@ -59,7 +56,7 @@ class AbstractResolverTest {
 
     @BeforeEach
     void setUp() {
-        resolver = new AbstractResolver() {
+        resolver = new AbstractResolver(new Options()) {
         };
     }
 
