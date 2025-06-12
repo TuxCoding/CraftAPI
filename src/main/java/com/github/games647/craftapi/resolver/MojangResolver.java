@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.Inet6Address;
 import java.net.InetAddress;
-import java.net.ProxySelector;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -64,11 +63,16 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
     private static final String HAS_JOINED_URL_RAW = "https://sessionserver.mojang.com/session/minecraft/hasJoined?" +
             "username=%s&serverId=%s";
 
-    private int maxNameRequests = 600;
-    private final RateLimiter profileLimiter = new TickingRateLimiter(
-            Ticker.systemTicker(), maxNameRequests,
-            TimeUnit.MINUTES.toMillis(10)
-    );
+    private final RateLimiter profileLimiter;
+
+    public MojangResolver(Options options) {
+        super(options);
+
+        profileLimiter = new TickingRateLimiter(
+                Ticker.systemTicker(), options.getMaxNameRequests(),
+                TimeUnit.MINUTES.toMillis(10)
+        );
+    }
 
     @Override
     public Optional<Verification> hasJoined(String username, String serverHash, InetAddress hostIp)
@@ -258,20 +262,5 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
         } catch (InterruptedException e) {
             throw new IOException(e);
         }
-    }
-
-    /**
-     * @param proxySelector proxy selector that should be used
-     */
-    public void setProxySelector(ProxySelector proxySelector) {
-        proxyClient = HttpClient.newBuilder().proxy(proxySelector).build();
-    }
-
-    /**
-     * @param maxNameRequests maximum amount of name to UUID requests that will be established to Mojang directly
-     *                        without proxies. (Between 0 and 600 within 10 minutes)
-     */
-    public void setMaxNameRequests(int maxNameRequests) {
-        this.maxNameRequests = Math.max(600, maxNameRequests);
     }
 }

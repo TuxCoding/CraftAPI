@@ -4,14 +4,13 @@ import com.github.games647.craftapi.InstantAdapter;
 import com.github.games647.craftapi.NamePredicate;
 import com.github.games647.craftapi.UUIDAdapter;
 import com.github.games647.craftapi.cache.Cache;
-import com.github.games647.craftapi.cache.MemoryCache;
 import com.github.games647.craftapi.model.skin.Skin;
 import com.github.games647.craftapi.model.skin.SkinProperty;
-import com.github.games647.craftapi.resolver.http.RotatingSourceFactory;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import java.net.InetAddress;
+import java.io.Closeable;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -20,27 +19,47 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.Collection;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.function.Predicate;
 
 /**
  * Base class for fetching Minecraft related data.
  */
-public abstract class AbstractResolver {
+public abstract class AbstractResolver implements Closeable {
 
     protected final Predicate<String> validNamePredicate = new NamePredicate();
-    protected RotatingSourceFactory sslFactory;
 
-    protected Cache cache = new MemoryCache();
+    protected final Cache cache;
 
     protected final Gson gson = new GsonBuilder()
             .registerTypeAdapter(UUID.class, new UUIDAdapter())
             .registerTypeAdapter(Instant.class, new InstantAdapter())
             .create();
 
-    protected final HttpClient client = HttpClient.newHttpClient();
-    protected HttpClient proxyClient;
+    protected final HttpClient client;
+    protected final HttpClient proxyClient;
+
+    public AbstractResolver(Options options) {
+        cache = options.getCache();
+
+        HttpClient.Builder builder = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5));
+        Executor executor = options.getExecutor();
+        if (executor != null) {
+            builder = builder.executor(executor);
+        }
+
+        client = builder.build();
+        HttpClient.Builder proxyBuilder = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .proxy(options.getProxySelector());
+        if (executor != null) {
+            proxyBuilder = proxyBuilder.executor(executor);
+        }
+
+        proxyClient = proxyBuilder.build();
+    }
 
     /**
      * Decodes the property from a skin request.
@@ -95,31 +114,20 @@ public abstract class AbstractResolver {
         return cache;
     }
 
-    /**
-     * Sets a new Mojang cache.
-     *
-     * @param cache cache implementation
-     */
-    public void setCache(Cache cache) {
-        this.cache = cache;
+    @Override
+    public void close() throws IOException {
+        closeClient(client);
+        closeClient(proxyClient);
     }
 
-    /**
-     * Set the outgoing addresses. The rotating order will be the same as in the given collection.
-     *
-     * @param addresses all outgoing IPv4 addresses that are available or empty to disable it.
-     */
-    @Deprecated
-    public void setOutgoingAddresses(Collection<InetAddress> addresses) {
-        if (addresses.isEmpty()) {
-            sslFactory = null;
-            return;
+    private void closeClient(HttpClient proxyClient) throws IOException {
+        if (proxyClient instanceof AutoCloseable) {
+            AutoCloseable closeableClient = (AutoCloseable) client;
+            try {
+                closeableClient.close();
+            } catch (Exception ex) {
+                throw new IOException(ex);
+            }
         }
-
-        if (sslFactory == null) {
-            sslFactory = new RotatingSourceFactory();
-        }
-
-        sslFactory.setOutgoingAddresses(addresses);
     }
 }
