@@ -121,6 +121,8 @@ public abstract class AbstractResolver implements Closeable {
     }
 
     private void closeClient(HttpClient proxyClient) throws IOException {
+        // autoclosable check is required, because the interface was later introduced
+        //noinspection DataFlowIssue
         if (proxyClient instanceof AutoCloseable) {
             AutoCloseable closeableClient = (AutoCloseable) client;
             try {
