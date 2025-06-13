@@ -48,6 +48,8 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
 
     //profile
     private static final String UUID_URL = "https://api.mojang.com/users/profiles/minecraft/";
+    private static final String BACKUP_UUID_URL = "https://api.minecraftservices.com/minecraft/profile/lookup/name/";
+    private boolean useBackupUuidUrl;
 
     //skin
     private static final String CHANGE_SKIN_URL = "https://api.mojang.com/user/profile/%s/skin";
@@ -164,7 +166,7 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
             return optProfile;
         }
 
-        String url = UUID_URL + name;
+        String url = (useBackupUuidUrl ? BACKUP_UUID_URL : UUID_URL) + name;
         HttpRequest req = createJSONGet(url);
 
         HttpClient client = this.client;
@@ -193,6 +195,19 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
 
                 // another try with a proxy
                 return findProfile(proxyClient, req);
+            }
+
+            if (responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                if (useBackupUuidUrl) {
+                    throw new IOException("Both Mojang APIs returned 403 Forbidden");
+                }
+
+                useBackupUuidUrl = true;
+                // extract only the username and query parameters
+                String backupUrl = BACKUP_UUID_URL + req.uri().getPath()
+                    .substring(req.uri().getPath().lastIndexOf('/') + 1);
+                HttpRequest backupReq = createJSONGet(backupUrl);
+                return findProfile(client, backupReq);
             }
 
             if (responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
