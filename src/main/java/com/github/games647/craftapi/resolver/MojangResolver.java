@@ -216,6 +216,7 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
 
             //todo: print errorstream on IOException
             Profile profile = readJson(resp.body(), Profile.class);
+            System.out.println("Parsed " + profile);
             cache.add(profile);
             return Optional.of(profile);
         } catch (InterruptedException interruptedException) {

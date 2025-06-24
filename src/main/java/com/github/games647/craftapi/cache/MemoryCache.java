@@ -51,7 +51,12 @@ public class MemoryCache implements Cache {
 
     @Override
     public void add(Profile profile) {
-        uuidToProfileCache.put(profile.getId(), profile);
+        if (profile.getId() == null) {
+            System.out.println("Warning UUID is null - Cannot add to cache " + profile);
+        } else {
+            uuidToProfileCache.put(profile.getId(), profile);
+        }
+
         nameToProfileCache.put(profile.getName().toLowerCase(), profile);
     }
 
