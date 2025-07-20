@@ -92,7 +92,7 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
             HttpResponse<String> resp = client.send(req, BodyHandlers.ofString());
 
             int responseCode = resp.statusCode();
-            if (responseCode == HttpURLConnection.HTTP_NOT_FOUND || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+            if (responseCode == HttpURLConnection.HTTP_NO_CONTENT || responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
                 return Optional.empty();
             }
 
@@ -210,13 +210,12 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
                 return findProfile(client, backupReq);
             }
 
-            if (responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+            if (responseCode == HttpURLConnection.HTTP_NO_CONTENT || responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
                 return Optional.empty();
             }
 
             //todo: print errorstream on IOException
             Profile profile = readJson(resp.body(), Profile.class);
-            System.out.println("Parsed " + profile);
             cache.add(profile);
             return Optional.of(profile);
         } catch (InterruptedException interruptedException) {
@@ -254,7 +253,7 @@ public class MojangResolver extends AbstractResolver implements AuthResolver, Pr
                 throw new RateLimitException();
             }
 
-            if (responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+            if (responseCode == HttpURLConnection.HTTP_NO_CONTENT || responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
                 return Optional.empty();
             }
 
